@@ -1,6 +1,6 @@
-package org.example.server;
+package org.johncricketCodingChallenges.loadBalancer.server;
 
-import org.example.loadbalancer.ConsistentHasher;
+import org.johncricketCodingChallenges.loadBalancer.loadbalancer.ConsistentHasher;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;

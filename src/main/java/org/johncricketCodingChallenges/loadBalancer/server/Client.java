@@ -1,4 +1,4 @@
-package org.example.server;
+package org.johncricketCodingChallenges.loadBalancer.server;
 
 import java.io.IOException;
 import java.net.Socket;

@@ -1,4 +1,4 @@
-package org.example.loadbalancer;
+package org.johncricketCodingChallenges.loadBalancer.loadbalancer;
 
 import java.math.BigInteger;
 import java.security.MessageDigest;

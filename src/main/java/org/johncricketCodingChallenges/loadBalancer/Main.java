@@ -1,8 +1,7 @@
-package org.example;
+package org.johncricketCodingChallenges.loadBalancer;
 
-import org.example.loadbalancer.ConsistentHasher;
-import org.example.server.Client;
-import org.example.server.Server;
+import org.johncricketCodingChallenges.loadBalancer.loadbalancer.ConsistentHasher;
+import org.johncricketCodingChallenges.loadBalancer.server.Server;
 
 public class Main {
     public static void main(String[] args) {
