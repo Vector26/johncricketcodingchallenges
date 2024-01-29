@@ -1,6 +1,8 @@
 package org.johncricketCodingChallenges.loadBalancer.server;
 
 import org.johncricketCodingChallenges.loadBalancer.loadbalancer.ConsistentHasher;
+import org.johncricketCodingChallenges.loadBalancer.loadbalancer.LoadBalancer;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -12,9 +14,9 @@ public class Server implements Runnable {
     private int port;
     private int poolSize = 10;
     private Threadpool threadpool;
-    private ConsistentHasher loadBalancer;
+    private LoadBalancer loadBalancer;
 
-    public Server(int port, ConsistentHasher loadBalancer) {
+    public Server(int port, LoadBalancer loadBalancer) {
         this.port = port;
         this.threadpool = new Threadpool(poolSize, "Server on port " + port);
         this.loadBalancer = loadBalancer;
@@ -57,22 +59,22 @@ public class Server implements Runnable {
 
     private static class ClientHandler implements Runnable {
         private Socket clientSocket; // Socket representing the connection to the client
-        private ConsistentHasher consistentHasher; // Used for determining the target server when load balancing
+        private LoadBalancer loadBalancer; // Used for determining the target server when load balancing
         private int port; // The port number of the server or load balancer
 
         // Constructor for handling client requests directly (without load balancer)
         public ClientHandler(Socket clientSocket, int serverPort) {
             this.clientSocket = clientSocket;
-            this.consistentHasher = null;
+            this.loadBalancer = null;
             this.port = serverPort;
             // Log indicating the creation of a client handler without a consistent hasher
             System.out.println("[Server on port " + serverPort + "] ClientHandler created without consistent hasher.");
         }
 
         // Constructor for handling client requests via load balancer
-        public ClientHandler(Socket clientSocket, ConsistentHasher consistentHasher, int serverPort) {
+        public ClientHandler(Socket clientSocket, LoadBalancer loadBalancer, int serverPort) {
             this.clientSocket = clientSocket;
-            this.consistentHasher = consistentHasher;
+            this.loadBalancer = loadBalancer;
             this.port = serverPort;
             // Log indicating the creation of a client handler with a consistent hasher (load balancer)
             System.out.println("[Load Balancer on port " + serverPort + "] ClientHandler created with consistent hasher.");
@@ -84,14 +86,14 @@ public class Server implements Runnable {
             System.out.println("[Handler on port " + port + "] ClientHandler started.");
 
             // Check if this handler is being used in a load balancing context
-            if (consistentHasher != null) {
+            if (loadBalancer != null) {
                 // Open a BufferedReader to read data from the client
                 try (BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
                     // Log for reading the request from the client
                     System.out.println("Reading request from client...");
                     String requestLine = in.readLine(); // Read the request line (e.g., "GET / HTTP/1.1")
                     System.out.println("Request line: " + requestLine);
-                    String targetServer = consistentHasher.getServer(requestLine); // Determine the target server using the consistent hasher
+                    String targetServer = loadBalancer.getServer(requestLine); // Determine the target server using the consistent hasher
                     System.out.println("Target server determined by consistent hasher: " + targetServer);
 
                     // Forward the request to the determined target server
@@ -143,13 +145,6 @@ public class Server implements Runnable {
 
                 // Log the response sent to the client
                 System.out.println("[Server " + (port - 1003) + "] Sent response: " + responseMessage);
-
-                // Wait for 5 seconds before closing the socket (for demonstration purposes)
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    System.out.println("Interrupted while waiting: " + e.getMessage());
-                }
             } catch (IOException e) {
                 // Log any IO exceptions that occur
                 System.out.println("Error handling direct client request: " + e.getMessage());
@@ -192,6 +187,9 @@ public class Server implements Runnable {
                     if (line.isEmpty()) break; // Detect end of HTTP headers
                 }
                 serverWriter.println(); // Ensure request is terminated properly
+
+                //Relieving the server from client processing in the load balancer
+                loadBalancer.relieveServer(serverAddress);
 
                 // Read the response from the target server and forward it to the client
                 while ((line = serverReader.readLine()) != null) {
