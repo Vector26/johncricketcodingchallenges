@@ -1,72 +1,95 @@
-package org.johncricketCodingChallenges.loadBalancer.loadbalancer;
+package org.johncricketCodingChallenges;
+import org.johncricketCodingChallenges.loadBalancer.loadbalancer.LoadBalancer;
 
-import java.util.PriorityQueue;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.*;
 
 public class DynamicWeightedRoundRobin implements LoadBalancer {
     private static class Server {
         String address;
-        int load;
+        AtomicInteger load;
 
         Server(String address) {
             this.address = address;
-            this.load = 0;
+            this.load = new AtomicInteger(0);
         }
 
         void increaseLoad() {
-            this.load++;
+            this.load.incrementAndGet();
         }
 
         void decreaseLoad() {
-            this.load--;
+            this.load.decrementAndGet();
+        }
+
+        int getLoad() {
+            return this.load.get();
         }
     }
 
     private PriorityQueue<Server> serverQueue;
     private Map<String, Server> serverMap;
+    private ReadWriteLock lock = new ReentrantReadWriteLock();
 
     public DynamicWeightedRoundRobin() {
-        serverQueue = new PriorityQueue<>(Comparator.comparingInt(s -> s.load));
+        serverQueue = new PriorityQueue<>(Comparator.comparingInt(Server::getLoad));
         serverMap = new HashMap<>();
     }
 
     @Override
-    public synchronized void addServer(String serverAddress) {
-        Server server = new Server(serverAddress);
-        serverQueue.offer(server);
-        serverMap.put(serverAddress, server);
-    }
-
-    @Override
-    public synchronized void removeServer(String serverAddress) {
-        Server server = serverMap.get(serverAddress);
-        if (server != null) {
-            serverQueue.remove(server);
-            serverMap.remove(serverAddress);
+    public void addServer(String serverAddress) {
+        lock.writeLock().lock();
+        try {
+            Server server = new Server(serverAddress);
+            serverQueue.offer(server);
+            serverMap.put(serverAddress, server);
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 
     @Override
-    public synchronized String getServer(String request) {
+    public void removeServer(String serverAddress) {
+        lock.writeLock().lock();
+        try {
+            Server server = serverMap.get(serverAddress);
+            if (server != null) {
+                serverQueue.remove(server);
+                serverMap.remove(serverAddress);
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public String getServer(String request) {
+        lock.writeLock().lock();
         if (serverQueue.isEmpty()) {
             return null;
         }
         Server server = serverQueue.poll();
         server.increaseLoad();
         serverQueue.offer(server);
+        lock.writeLock().unlock();
         return server.address;
     }
 
+
     @Override
-    public synchronized void relieveServer(String serverAddress) {
-        Server server = serverMap.get(serverAddress);
-        if (server != null) {
-            serverQueue.remove(server);
-            server.decreaseLoad();
-            serverQueue.offer(server);
+    public void relieveServer(String serverAddress) {
+        lock.writeLock().lock();
+        try {
+            Server server = serverMap.get(serverAddress);
+            if (server != null) {
+                serverQueue.remove(server);
+                server.decreaseLoad();
+                serverQueue.offer(server);
+            }
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 }
-
